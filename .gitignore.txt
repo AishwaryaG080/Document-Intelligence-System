@@ -1,7 +1,0 @@
-# Python bytecode cache files
-__pycache__/
-*.pyc
-
-# Operating system metadata files
-Thumbs.db
-.DS_Store
