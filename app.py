@@ -11,7 +11,9 @@ def extract_text_from_pdf(pdf_file):
         for page in pdf_reader.pages:
             page_text = page.extract_text()
             if page_text:
-                pages_text.append(page_text.strip())
+                # Clean up dirty structural artifacts left by table grids and rows
+                cleaned_text = page_text.replace('",', ' ').replace('"', '').replace(',,', ' ')
+                pages_text.append(cleaned_text.strip())
     except Exception as e:
         st.error(f"Error while reading PDF: {e}")
     return pages_text
@@ -33,6 +35,11 @@ def search_relevant_context(question, pages):
             max_overlap = overlap
             best_page_context = page_content
             
+    # FALLBACK FIX: If it's a single-page document or a table structure where keyword overlap metrics 
+    # score low, default to passing the first available page data context so the LLM can parse it.
+    if not best_page_context and pages:
+        best_page_context = pages[0]
+        
     return best_page_context
 
 
@@ -80,11 +87,11 @@ def show_project_flow():
     ```text
     [ PDF Upload Box ]
             ↓
-    [ extract_text_from_pdf() ] ───> Parses text page-by-page
+    [ extract_text_from_pdf() ] ───> Parses text page-by-page & cleans table structures
             ↓
     [ Interactive Screen ] ────────> User clicks Quick Button or types custom input
             ↓
-    [ search_relevant_context() ] ──> Evaluates word metrics against text blocks
+    [ search_relevant_context() ] ──> Evaluates word metrics with structure fallback
             ↓
     [ Prompt Augmentation ] ───────> Bundles context string + question safely
             ↓
@@ -175,7 +182,7 @@ with tab1:
                     active_query = "Give me a concise summary of this document using exactly three bullet points."
             with btn_col2:
                 if st.button("🛠️ Extract Key Details & Skills", use_container_width=True):
-                    active_query = "What are the core skills, key technologies, or main project topics mentioned in this document?"
+                    active_query = "What are the core business operational details, items, vendor codes, or main topics mentioned in this document?"
 
             # Native user text collection bar
             chat_input = st.chat_input("Ask a custom question from the uploaded document matrix...")
@@ -199,7 +206,6 @@ with tab1:
                             st.info(retrieved_context)
 
                         with st.spinner("Generating inference using local Ollama model..."):
-                           
                             answer = ask_local_ollama(active_query, retrieved_context)
                         
                         st.subheader("Generated Answer")
